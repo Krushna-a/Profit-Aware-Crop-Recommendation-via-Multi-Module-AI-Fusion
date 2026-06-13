@@ -1,0 +1,111 @@
+# =============================================================================
+# Profit-Aware Crop Recommendation — Project Configuration
+# All hyperparameters, paths, and data sources are centralized here.
+# =============================================================================
+
+project:
+  name: "Profit-Aware Crop Recommendation via Multi-Module AI Fusion"
+  seed: 42
+  log_level: "INFO"
+
+# -----------------------------------------------------------------------------
+# Data sources
+# -----------------------------------------------------------------------------
+data:
+  # Kaggle Crop Recommendation dataset (2200 rows, 22 crops)
+  # Source: https://www.kaggle.com/datasets/varshitanalluri/crop-recommendation-dataset
+  # Mirrored on GitHub for reproducibility (CC0 public domain)
+  crop_dataset_url: "https://raw.githubusercontent.com/Gladiator07/Harvestify/master/Data-processed/crop_recommendation.csv"
+
+  # World Bank Pink Sheet — monthly commodity prices (wheat, rice, cotton)
+  # Source: https://www.worldbank.org/en/research/commodity-markets
+  # Direct Excel download (publicly available, no auth required)
+  pinksheet_url: "https://thedocs.worldbank.org/en/doc/5d903e848db1d1b83e0ec8f744e55570-0350012021/related/CMO-Historical-Data-Monthly.xlsx"
+
+  # FAOSTAT crop yield — India, wheat/rice/cotton, 1990-2023
+  # Fetched via faostat Python package (FAO open data)
+  faostat_countries: ["India"]
+  faostat_crops: ["Wheat", "Rice, paddy", "Seed cotton, unginned"]
+  faostat_year_start: 2000
+  faostat_year_end: 2023
+
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+
+# World Bank Pink Sheet commodity column names (as they appear in the sheet)
+price_columns:
+  Wheat: "Wheat, US HRW"
+  Rice: "Rice, Thai 5%"
+  Cotton: "Cotton, A Index"
+
+# Crops we model (must be present in both the crop dataset and price data)
+target_crops: ["rice", "wheat", "cotton"]
+
+# Price forecast horizon: predict N months ahead (harvest window)
+forecast_horizon_months: 3
+
+# -----------------------------------------------------------------------------
+# Train / test split
+# -----------------------------------------------------------------------------
+split:
+  # Stratified split for classification/regression modules
+  test_size: 0.20
+  # Chronological split ratio for the price time series
+  # NEVER use random split on price data — see price_forecaster.py for details
+  price_train_ratio: 0.80
+  price_val_ratio: 0.10   # val = 0.80 to 0.90, test = last 0.10
+
+# -----------------------------------------------------------------------------
+# Module A — Random Forest Classifier
+# -----------------------------------------------------------------------------
+classifier:
+  n_estimators: 300
+  max_depth: 15
+  max_features: "sqrt"      # m = sqrt(p): decorrelates trees, reduces pairwise correlation rho
+  min_samples_leaf: 4
+  class_weight: "balanced"  # handles class imbalance without oversampling
+
+# -----------------------------------------------------------------------------
+# Module B — XGBoost Yield Regressor
+# -----------------------------------------------------------------------------
+yield_regressor:
+  n_estimators: 500
+  learning_rate: 0.03       # eta: shrinkage factor per boosting round
+  max_depth: 6
+  subsample: 0.80
+  colsample_bytree: 0.80
+  reg_lambda: 1.5           # L2 regularization on leaf weights
+  reg_alpha: 0.1            # L1 regularization on leaf weights
+  early_stopping_rounds: 40
+
+# -----------------------------------------------------------------------------
+# Module C — MLP Price Forecaster (sklearn)
+# In production: swap for LSTM/Transformer; math documented in price_forecaster.py
+# -----------------------------------------------------------------------------
+price_forecaster:
+  seq_len: 24               # 24-month lookback window
+  hidden_layers: [128, 64, 32]
+  activation: "relu"
+  learning_rate: 0.001
+  max_iter: 500
+  early_stopping: true
+  n_iter_no_change: 30
+
+# -----------------------------------------------------------------------------
+# Profit engine
+# -----------------------------------------------------------------------------
+profit:
+  # Operational costs per hectare (USD) — sourced from World Bank agri cost data
+  # Wheat: ~$180–220/ha (South Asia avg), Rice: ~$250–300/ha, Cotton: $280–350/ha
+  operational_costs:
+    wheat: 200.0
+    rice:  275.0
+    cotton: 315.0
+
+# -----------------------------------------------------------------------------
+# Output paths
+# -----------------------------------------------------------------------------
+outputs:
+  models_dir: "outputs/models"
+  reports_dir: "outputs/reports"
+  plots_dir: "outputs/plots"

@@ -1,0 +1,10 @@
+data/raw/
+data/processed/
+outputs/
+__pycache__/
+*.pyc
+.venv/
+venv/
+pipeline.log
+*.egg-info/
+.DS_Store
